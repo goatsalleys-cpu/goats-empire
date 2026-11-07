@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: goats-empire
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TREASURY_ADDRESS
+        value: 1NxwbpbeS8Twp8G96CbcYNGuz5vxedyzMD
