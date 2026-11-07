@@ -1,12 +1,12 @@
-
+{
   "name": "goats-empire",
   "version": "1.0.0",
-  "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.js"
   },
-"dependencies": {
-  "express": "^4.21.2",
-  "pg": "^8.13.1"
+  "dependencies": {
+    "express": "^4.21.2",
+    "pg": "^8.13.1"
+  }
 }
