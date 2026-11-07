@@ -1,65 +1,74 @@
 import express from "express";
+import pg from "pg";
 
+const { Pool } = pg;
 const app = express();
+
 app.use(express.json());
 
 const PORT = process.env.PORT || 3000;
-const TREASURY_ADDRESS =
-  process.env.TREASURY_ADDRESS ||
-  "1NxwbpbeS8Twp8G96CbcYNGuz5vxedyzMD";
+const TREASURY_ADDRESS = process.env.TREASURY_ADDRESS;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL
+    ? { rejectUnauthorized: false }
+    : false
+});
 
 app.get("/health", (req, res) => {
-  res.json({
-    status: "ok",
-    application: "Goats Empire",
-    timestamp: new Date().toISOString()
-  });
+  res.json({ status: "online", service: "Goats Empire" });
+});
+
+app.get("/api/db-health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ status: "connected", database: "PostgreSQL" });
+  } catch (error) {
+    console.error("Database check failed");
+    res.status(503).json({ status: "disconnected" });
+  }
 });
 
 app.get("/api/treasury", async (req, res) => {
   try {
-    const url =
-      `https://blockstream.info/api/address/${TREASURY_ADDRESS}`;
+    if (!TREASURY_ADDRESS) {
+      return res.status(500).json({ error: "Treasury address not configured" });
+    }
 
-    const response = await fetch(url);
+    const response = await fetch(
+      `https://blockstream.info/api/address/${TREASURY_ADDRESS}`
+    );
 
     if (!response.ok) {
-      return res.status(502).json({
-        error: "Bitcoin data provider unavailable"
-      });
+      throw new Error("Blockchain provider unavailable");
     }
 
     const data = await response.json();
 
-    const confirmedSats =
+    const confirmed =
       data.chain_stats.funded_txo_sum -
       data.chain_stats.spent_txo_sum;
 
-    const unconfirmedSats =
+    const unconfirmed =
       data.mempool_stats.funded_txo_sum -
       data.mempool_stats.spent_txo_sum;
-
-    res.set("Cache-Control", "no-store");
 
     res.json({
       network: "Bitcoin Mainnet",
       address: TREASURY_ADDRESS,
-      confirmed_satoshis: confirmedSats,
-      confirmed_btc: confirmedSats / 100000000,
-      unconfirmed_satoshis: unconfirmedSats,
-      unconfirmed_btc: unconfirmedSats / 100000000,
-      checked_at: new Date().toISOString(),
-      source: url
+      confirmed_sats: confirmed,
+      confirmed_btc: confirmed / 100000000,
+      unconfirmed_sats: unconfirmed,
+      unconfirmed_btc: unconfirmed / 100000000,
+      source: "Blockstream",
+      checked_at: new Date().toISOString()
     });
   } catch (error) {
-    console.error("Treasury verification failed:", error.message);
-
-    res.status(500).json({
-      error: "Unable to verify treasury balance"
-    });
+    res.status(502).json({ error: "Unable to verify treasury balance" });
   }
 });
 
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log(`Goats Empire listening on port ${PORT}`);
 });
